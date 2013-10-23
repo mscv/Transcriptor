@@ -189,7 +189,7 @@ function addon:OnChatMessage(channelCurrent, bGM, bSelf, strSender, strRealmName
 		for _, tSegment in ipairs(arMessageSegments) do
 			strMessage = strMessage .. tSegment.strText
 		end
-		local tTextInfo = {channelCurrent:GetType(), bGM, bSelf, strSender, strRealmName, strMessage, unitSource:GetId(), bBubble}
+		local tTextInfo = {channelCurrent:GetType(), bGM, bSelf, strSender, strRealmName, strMessage, unitSource and unitSource:GetId(), bBubble}
 		tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "OnChatMessage")
 	end
 end
