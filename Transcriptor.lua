@@ -5,6 +5,7 @@
 
 require "Window"
 require "GameLib"
+require "ChatSystemLib"
 
 -----------------------------------------------------------------------------------------------
 -- Upvalues
@@ -20,12 +21,22 @@ local Print = Print
 local GameLib = GameLib
 
 -----------------------------------------------------------------------------------------------
--- Module Definition
+-- Module Definition and variables
 -----------------------------------------------------------------------------------------------
 local Transcriptor = {}
 local addon = Transcriptor
 local tSession
-
+local chatFilter = {
+	ChatSystemLib.ChatChannel_NPCSay,     --20
+	ChatSystemLib.ChatChannel_NPCYell,    --21
+	ChatSystemLib.ChatChannel_NPCWhisper, --22
+	ChatSystemLib.ChatChannel_Datachron,  --23
+	--ChatSystemLib.ChatChannel_Say,        --4
+	ChatSystemLib.ChatChannel_System,     --2
+	ChatSystemLib.ChatChannel_Zone,       --9
+	ChatSystemLib.ChatChannel_Instance,   --32
+	ChatSystemLib.ChatChannel_Realm,      --25
+}
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -48,10 +59,7 @@ function addon:OnLoad()
 	Apollo.RegisterEventHandler("CombatLogCCStateBreak", 			"OnCombatLogCCStateBreak", self)
 	Apollo.RegisterEventHandler("CombatLogFallingDamage", 			"OnCombatLogFallingDamage", self)
 	Apollo.RegisterEventHandler("CombatLogHeal", 					"OnCombatLogHeal", self)
-	-- figure these out
-	Apollo.RegisterEventHandler("CombatLogDelayDeath", 				"OnCombatLogDelayDeath", self)
 	Apollo.RegisterEventHandler("CombatLogDispel", 					"OnCombatLogDispel", self)
-	Apollo.RegisterEventHandler("CombatLogModifyInterruptArmor", 	"OnCombatLogModifyInterruptArmor", self)
 	Apollo.RegisterEventHandler("CombatLogTransference", 			"OnCombatLogTransference", self)
 	Apollo.RegisterEventHandler("CombatLogVitalModifier", 			"OnCombatLogVitalModifier", self)
 	Apollo.RegisterEventHandler("CombatLogDeflect", 				"OnCombatLogDeflect", self)
@@ -59,16 +67,21 @@ function addon:OnLoad()
 	Apollo.RegisterEventHandler("CombatLogInterrupted", 			"OnCombatLogInterrupted", self)
 	Apollo.RegisterEventHandler("CombatLogDeath", 					"OnCombatLogDeath", self)
 	Apollo.RegisterEventHandler("CombatLogResurrect", 				"OnCombatLogResurrect", self)
-	Apollo.RegisterEventHandler("CombatLogStealth", 				"OnCombatLogStealth", self)
 	Apollo.RegisterEventHandler("CombatLogPet", 					"OnCombatLogPet", self)
 	Apollo.RegisterEventHandler("UnitEnteredCombat", 				"OnEnteredCombat", self)
+	Apollo.RegisterEventHandler("ChatMessage", 						"OnChatMessage", self)
+	-- figure these out
+	Apollo.RegisterEventHandler("CombatLogDelayDeath", 				"OnCombatLogDelayDeath", self)
+	Apollo.RegisterEventHandler("CombatLogStealth", 				"OnCombatLogStealth", self)
+	Apollo.RegisterEventHandler("CombatLogModifyInterruptArmor", 	"OnCombatLogModifyInterruptArmor", self)
+
 	-- this must be really resource heavy
-	Apollo.RegisterEventHandler("UnitCreated", 							"OnUnitCreated", self)
-	Apollo.RegisterEventHandler("UnitDestroyed", 						"OnUnitDestroyed", self)
+	Apollo.RegisterEventHandler("UnitCreated", 						"OnUnitCreated", self)
+	Apollo.RegisterEventHandler("UnitDestroyed", 					"OnUnitDestroyed", self)
 	self.tUnits = {}
 	--tUnits = self.tUnits
 
-	Apollo.RegisterEventHandler("NextFrame", "OnUpdate", self)
+	Apollo.RegisterEventHandler("NextFrame", 						"OnUpdate", self)
 
 	-- load our forms
 	self.wndMain = Apollo.LoadForm("Transcriptor.xml", "TranscriptorForm", nil, self)
@@ -157,18 +170,32 @@ function addon:HelperGetId(nArg)
 	return ""
 end
 
+local function checkChatFilter(channelType)
+	for _, v in ipairs(chatFilter) do
+		if v == channelType then
+			return true
+		end
+	end
+	return false
+end
+
 -----------------------------------------------------------------------------------------------
 -- Event handlers
 -----------------------------------------------------------------------------------------------
 
+function addon:OnChatMessage(channelCurrent, bGM, bSelf, strSender, strRealmName, arMessageSegments, unitSource, bBubble)
+	if checkChatFilter(channelCurrent:GetType()) then
+		local strMessage = ""
+		for _, tSegment in ipairs(arMessageSegments) do
+			strMessage = strMessage .. tSegment.strText
+		end
+		local tTextInfo = {channelCurrent:GetType(), bGM, bSelf, strSender, strRealmName, strMessage, unitSource:GetId(), bBubble}
+		tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "OnChatMessage")
+	end
+end
+
 function addon:OnUpdate()
-	--p = GameLib.GetPlayerUnit()
-	--if p:IsCasting() then
-	--	Print(p:GetCastName())
-	--end
-
 	--local pId = GameLib.GetPlayerUnit():GetId()
-
 	for k, v in pairs(self.tUnits) do
 		local unit = v.unit
 		-- casting
