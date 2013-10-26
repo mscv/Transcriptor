@@ -37,6 +37,13 @@ local chatFilter = {
 	ChatSystemLib.ChatChannel_Instance,   --32
 	ChatSystemLib.ChatChannel_Realm,      --25
 }
+local tooltipText = "\
+<T Font='CRB_InterfaceMedium_B' TextColor='ffffffff'>\
+<T TextColor='ffffff00'>Left click</T> to toggle logging on or off\n\
+<T TextColor='ffffff00'>Alt + Left click</T> to reset all sessions data\n\
+</T>\
+"
+
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -82,6 +89,7 @@ function addon:OnLoad()
 	-- load our forms
 	self.wndMain = Apollo.LoadForm("Transcriptor.xml", "TranscriptorForm", nil, self)
 	self.wndMain:Show(true)
+	self.wndMain:FindChild("Button"):SetTooltip(tooltipText)
 	self.bLogging = false
 	self.tPrevDB = {}
 	self.tDB = {}
@@ -92,7 +100,11 @@ function addon:OnLoad()
 end
 
 function addon:EnableLogging()
-	self.sSession = ("%s - map/%s/subzone/difficulty/revision/gameVersion/buildVersion"):format(os.date(), GameLib.GetCurrentZoneMap().strName) -- XXX fill these out
+	local zone = "Unknown Zone"
+	if GameLib.GetCurrentZoneMap() then
+		zone = GameLib.GetCurrentZoneMap().strName
+	end
+	self.sSession = ("%s - map/%s/subzone/difficulty/revision/gameVersion/buildVersion"):format(os.date(), zone) -- XXX fill these out
 	self.tDB[self.sSession] = {}
 	self.bLogging = true
 	self.wndMain:GetChildren()[1]:SetText("Transcriptor: On")
