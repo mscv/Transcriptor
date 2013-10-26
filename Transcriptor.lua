@@ -25,7 +25,7 @@ local GameLib = GameLib
 -----------------------------------------------------------------------------------------------
 local Transcriptor = {}
 local addon = Transcriptor
-local tSession
+local tSessionDB
 local chatFilter = {
 	ChatSystemLib.ChatChannel_NPCSay,     --20
 	ChatSystemLib.ChatChannel_NPCYell,    --21
@@ -51,9 +51,10 @@ function addon:Init()
 	Apollo.RegisterAddon(self)
 end
 -----------------------------------------------------------------------------------------------
--- OnLoad
+-- OnLoad and Enabling stuff
 -----------------------------------------------------------------------------------------------
 function addon:OnLoad()
+	-- register events
 	Apollo.RegisterEventHandler("CombatLogDamage", 					"OnCombatLogDamage", self)
 	Apollo.RegisterEventHandler("CombatLogCCState", 				"OnCombatLogCCState", self)
 	Apollo.RegisterEventHandler("CombatLogCCStateBreak", 			"OnCombatLogCCStateBreak", self)
@@ -74,24 +75,72 @@ function addon:OnLoad()
 	Apollo.RegisterEventHandler("CombatLogDelayDeath", 				"OnCombatLogDelayDeath", self)
 	Apollo.RegisterEventHandler("CombatLogStealth", 				"OnCombatLogStealth", self)
 	Apollo.RegisterEventHandler("CombatLogModifyInterruptArmor", 	"OnCombatLogModifyInterruptArmor", self)
-
 	-- this must be really resource heavy
 	Apollo.RegisterEventHandler("UnitCreated", 						"OnUnitCreated", self)
 	Apollo.RegisterEventHandler("UnitDestroyed", 					"OnUnitDestroyed", self)
-	self.tUnits = {}
-	--tUnits = self.tUnits
-
 	Apollo.RegisterEventHandler("NextFrame", 						"OnUpdate", self)
-
 	-- load our forms
 	self.wndMain = Apollo.LoadForm("Transcriptor.xml", "TranscriptorForm", nil, self)
 	self.wndMain:Show(true)
+	self.bLogging = false
 	self.tPrevDB = {}
 	self.tDB = {}
-	self.sSession = ("%s - map/zone/subzone/difficulty/revision/gameVersion/buildVersion"):format(os.date()) -- XXX fill these out
-	self.tDB[self.sSession] = {}
-	tSession = self.tDB[self.sSession]
+	tSessionDB = self.tDB
+	self.tUnits = {}
+	-- XXX for now start logging from start
+	self:EnableLogging()
+end
 
+function addon:EnableLogging()
+	self.sSession = ("%s - map/%s/subzone/difficulty/revision/gameVersion/buildVersion"):format(os.date(), GameLib.GetCurrentZoneMap().strName) -- XXX fill these out
+	self.tDB[self.sSession] = {}
+	self.bLogging = true
+	self.wndMain:GetChildren()[1]:SetText("Transcriptor: On")
+end
+
+function addon:DisableLogging()
+	self.sSession = nil
+	self.bLogging = false
+	self.wndMain:GetChildren()[1]:SetText("Transcriptor: Off")
+end
+
+-----------------------------------------------------------------------------------------------
+-- GUI and SavedVariables
+-----------------------------------------------------------------------------------------------
+
+-- when the Cancel button is clicked
+function addon:OnButton()
+	if Apollo.IsAltKeyDown() then
+		if self.bLogging then
+			Print("Transcriptor: you can only clear data if you are not logging!")
+		else
+			self.tPrevDB = {}
+			for k, v in pairs(tSessionDB) do
+				tSessionDB[k] = nil
+			end
+			Print("Transcriptor: cleared all sessions data.")
+		end
+	else
+		if self.bLogging then
+			self:DisableLogging()
+		else
+			self:EnableLogging()
+		end
+	end
+end
+
+function addon:OnSave(eLevel)
+	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then return end
+
+	for k, v in pairs(tSessionDB) do
+		self.tPrevDB[k] = v
+	end
+	return self.tPrevDB
+end
+
+function addon:OnRestore(eLevel, tData)
+	-- just store this and use it later
+	self.tPrevDB = tData
 end
 
 -----------------------------------------------------------------------------------------------
@@ -106,7 +155,12 @@ local function getLineFromIndexedTable(t, strEvent)
 	return s
 end
 
-local function putLineBuffApplied(unit, id, nCount, fTimeRemaining, spell, bHarmful, strEventType)
+function addon:putLine(str)
+	if not self.bLogging then return end
+	self.tDB[self.sSession][#self.tDB[self.sSession]+1] = str
+end
+
+function addon:getLineBuff(unit, id, nCount, fTimeRemaining, spell, bHarmful, strEventType)
 	if fTimeRemaining and fTimeRemaining == 4294967.5 then -- assume this is infinite (~50 days)
 		fTimeRemaining = "inf"
 	end
@@ -125,7 +179,7 @@ local function putLineBuffApplied(unit, id, nCount, fTimeRemaining, spell, bHarm
 	end
 	-- XXX look into GetAOETargetInfo and GetPrerequisites
 	local strEvent = (bHarmful and "Debuff" or "Buff") .. strEventType
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, strEvent)
+	self:putLine(getLineFromIndexedTable(tTextInfo, strEvent))
 end
 
 local function checkForMissingBuffById(unit, id)
@@ -151,9 +205,9 @@ function addon:HelperParseEvent(tEventArgs, tEventSpecificValues)
 		tInfo[#tInfo+1] = self:HelperGetId(tEventArgs[v])
 		if k == "splCallingSpell"  then
 			if v and v:GetSchool() then
-				Info[#tInfo+1] = v:GetSchool()
+				tInfo[#tInfo+1] = v:GetSchool()
 			else
-				Info[#tInfo+1] = ""
+				tInfo[#tInfo+1] = ""
 			end
 		end
 	end
@@ -197,11 +251,12 @@ function addon:OnChatMessage(channelCurrent, bGM, bSelf, strSender, strRealmName
 			strMessage = strMessage .. tSegment.strText
 		end
 		local tTextInfo = {channelCurrent:GetType(), bGM, bSelf, strSender, strRealmName, strMessage, unitSource and unitSource:GetId() or "", bBubble}
-		tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "OnChatMessage")
+		self:putLine(getLineFromIndexedTable(tTextInfo, "OnChatMessage"))
 	end
 end
 
 function addon:OnUpdate()
+	if not self.bLogging then return end
 	--local pId = GameLib.GetPlayerUnit():GetId()
 	for k, v in pairs(self.tUnits) do
 		local unit = v.unit
@@ -217,7 +272,7 @@ function addon:OnUpdate()
 				sTargetName, sTargetId = target:GetName(), target:GetId()
 			end
 			local tTextInfo = {os.time(), unit:GetName(), unit:GetId(), sTargetName, sTargetId, unit:IsCasting(), unit:GetCastBarType(), unit:GetCastDuration(), unit:GetCastElapsed(), unit:GetCastName(), unit:GetCastTotalPercent(), unit:GetSpellMechanicId(), unit:GetSpellMechanicPercentage(), unit:ShouldShowCastBar()}
-			tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "OnTimerCasting")
+			self:putLine(getLineFromIndexedTable(tTextInfo, "OnTimerCasting"))
 		end
 		-- buffs applied
 		local unitBuffs = unit:GetBuffs()
@@ -230,9 +285,9 @@ function addon:OnUpdate()
 					--if pId ~= unit:GetId() then return end
 					if self.tUnits[k].buffs[s.id] then -- refresh
 						if s.fTimeRemaining > self.tUnits[k].buffs[s.id].fTimeRemaining then
-							putLineBuffApplied(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "AppliedRenewed")
+							self:getLineBuff(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "AppliedRenewed")
 						elseif s.nCount ~= self.tUnits[k].buffs[s.id].nCount then -- this for when an aura has no duration but has stacks
-							putLineBuffApplied(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "Dose")
+							self:getLineBuff(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "Dose")
 						end
 						-- XXX probably don't need to keep track of everything, remove some that is not needed to improve performance
 						-- nCount and fTimeRemaining is needed so far
@@ -253,7 +308,7 @@ function addon:OnUpdate()
 							["spell"] = s.spell,
 							["harmful"] = harmful,
 						}
-						putLineBuffApplied(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "Applied")
+						self:getLineBuff(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "Applied")
 					end
 				end
 			end
@@ -262,7 +317,7 @@ function addon:OnUpdate()
 		for buffId, buffData in pairs(v.buffs) do
 			-- remember right now only player debuffs and non player buffs are tracked
 			if checkForMissingBuffById(unit, buffId) then
-				putLineBuffApplied(unit, buffData.id, buffData.nCount, buffData.fTimeRemaining, buffData.spell, buffData.harmful, "Removed")
+				self:getLineBuff(unit, buffData.id, buffData.nCount, buffData.fTimeRemaining, buffData.spell, buffData.harmful, "Removed")
 				self.tUnits[k].buffs[buffId] = nil
 			end
 		end
@@ -283,131 +338,107 @@ end
 local tCombatLogDamage = { "bTargetKilled", "nOverkill", "eEffectType", "nDamageAmount", "bPeriodic", "nShield", "nRawDamage", "eDamageType", "nAbsorption", "bTargetVulnerable", "eCombatResult" }
 function addon:OnCombatLogDamage(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogDamage")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDamage"))
 end
 
 local tCombatLogCCState = { "eResult", "strState", "eState", "nInterruptArmorHit", "eCombatResult", "bRemoved" }
 function addon:OnCombatLogCCState(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogCCState")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogCCState"))
 end
 
 local tCombatLogCCStateBreak = { "strState", "eState" }
 function addon:OnCombatLogCCStateBreak(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogCCStateBreak)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogCCStateBreak")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogCCStateBreak"))
 end
 
 local tCombatLogFallingDamage = { "nDamageAmount" }
 function addon:OnCombatLogFallingDamage(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogFallingDamage)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogFallingDamage")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogFallingDamage"))
 end
 
 local tCombatLogHeal = { "nOverheal", "nHealAmount", "eCombatResult", "eEffectType" }
 function addon:OnCombatLogHeal(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogHeal")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogHeal"))
 end
 
 function addon:OnEnteredCombat(unit, bInCombat)
 	if unit == GameLib.GetPlayerUnit() then
-		tSession[#tSession+1] = ("%s#%s#%s"):format(os.date("%H:%M:%S"), "PlayerEnteredCombat", tostring(bInCombat))
+		self:putLine(("%s#%s#%s"):format(os.date("%H:%M:%S"), "PlayerEnteredCombat", tostring(bInCombat)))
 	end
 end
 
 local tCombatLogVitalModifier = { "bShowCombatLog", "nAmount", "eCombatResult", "eVitalType" }
 function addon:OnCombatLogVitalModifier(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogVitalModifier")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogVitalModifier"))
 end
 
 local tCombatLogInterrupted = { "eCastResult", "eCombatResult", "strCastResult" }
 function addon:OnCombatLogInterrupted(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogInterrupted")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogInterrupted"))
 end
 
 local tCombatLogDeflect = { "eCombatResult" }
 function addon:OnCombatLogDeflect(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogDeflect")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDeflect"))
 end
 
 local tCombatLogPet = { "bDismissed", "eCombatResult", "bKilled" }
 function addon:OnCombatLogPet(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogPet)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogPet")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogPet"))
 end
 
 local tCombatLogDeath = { "" }
 function addon:OnCombatLogDeath(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDeath)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogDeath")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDeath"))
 end
 
 local tCombatLogResurrect = { "" }
 function addon:OnCombatLogResurrect(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogResurrect)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogResurrect")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogResurrect"))
 end
 
 local tCombatLogDispel = { "nInstancesRemoved", "bRemovesSingleInstance", "eCombatResult" }
 function addon:OnCombatLogDispel(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDispel)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogDispel")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDispel"))
 end
 
 local tCombatLogTransference = { "nOverheal", "nOverkill", "nDamageAmount", "eVitalType", "nAbsorption", "nHealAmount", "eCombatResult", "eDamageType", "bTargetVulnerable", "nShield" }
 function addon:OnCombatLogTransference(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogTransference)
-	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "CombatLogTransference")
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogTransference"))
 end
 
 -- figure out these
 function addon:OnCombatLogDelayDeath(tEventArgs)
 	tEventArgs["strEventName"] = "CombatLogDelayDeath"
-	tSession[#tSession+1] = tEventArgs
+	self:putLine(tEventArgs)
 end
 
 function addon:OnCombatLogModifyInterruptArmor(tEventArgs)
 	tEventArgs["strEventName"] = "CombatLogModifyInterruptArmor"
-	tSession[#tSession+1] = tEventArgs
+	self:putLine(tEventArgs)
 end
 
 function addon:OnCombatLogImmunity(tEventArgs)
 	tEventArgs["strEventName"] = "CombatLogImmunity"
-	tSession[#tSession+1] = tEventArgs
+	self:putLine(tEventArgs)
 end
-
 
 function addon:OnCombatLogStealth(tEventArgs)
 	tEventArgs["strEventName"] = "CombatLogStealth"
-	tSession[#tSession+1] = tEventArgs
+	self:putLine(tEventArgs)
 end
-
------------------------------------------------------------------------------------------------
--- GUI and SavedVariables
------------------------------------------------------------------------------------------------
-
--- when the Cancel button is clicked
-function addon:OnButton()
-	self.tPrevDB = {}
-	Print("Transcriptor cleared previous sessions data")
-end
-
-function addon:OnSave(eLevel)
-	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then return end
-
-	self.tPrevDB[self.sSession] = tSession
-	return self.tPrevDB
-end
-
-function addon:OnRestore(eLevel, tData)
-	-- just store this and use it later
-	self.tPrevDB = tData
-end
-
 
 -----------------------------------------------------------------------------------------------
 -- Instance
