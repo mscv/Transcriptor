@@ -123,7 +123,7 @@ local function putLineBuffApplied(unit, id, nCount, fTimeRemaining, spell, bHarm
 			Print(("[%s] = %s,"):format(k, v))
 		end
 	end
-	-- XXX look into renewed bolster GetAOETargetInfo and GetPrerequisites
+	-- XXX look into GetAOETargetInfo and GetPrerequisites
 	local strEvent = (bHarmful and "Debuff" or "Buff") .. strEventType
 	tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, strEvent)
 end
@@ -149,6 +149,13 @@ function addon:HelperParseEvent(tEventArgs, tEventSpecificValues)
 	for k, v in ipairs(tCasterTargetSpell) do
 		tInfo[#tInfo+1] = self:HelperGetName(tEventArgs[v])
 		tInfo[#tInfo+1] = self:HelperGetId(tEventArgs[v])
+		if k == "splCallingSpell"  then
+			if v and v:GetSchool() then
+				Info[#tInfo+1] = v:GetSchool()
+			else
+				Info[#tInfo+1] = ""
+			end
+		end
 	end
 	for k, v in ipairs(tEventSpecificValues) do
 		tInfo[#tInfo+1] = tEventArgs[v]
@@ -189,7 +196,7 @@ function addon:OnChatMessage(channelCurrent, bGM, bSelf, strSender, strRealmName
 		for _, tSegment in ipairs(arMessageSegments) do
 			strMessage = strMessage .. tSegment.strText
 		end
-		local tTextInfo = {channelCurrent:GetType(), bGM, bSelf, strSender, strRealmName, strMessage, unitSource and unitSource:GetId(), bBubble}
+		local tTextInfo = {channelCurrent:GetType(), bGM, bSelf, strSender, strRealmName, strMessage, unitSource and unitSource:GetId() or "", bBubble}
 		tSession[#tSession+1] = getLineFromIndexedTable(tTextInfo, "OnChatMessage")
 	end
 end
@@ -199,7 +206,7 @@ function addon:OnUpdate()
 	for k, v in pairs(self.tUnits) do
 		local unit = v.unit
 		-- casting
-		if unit:IsCasting() and unit:GetType() and unit:GetType() == "NonPlayer" then
+		if unit:IsCasting() and unit:GetType() and unit:GetType() == "NonPlayer" then -- XXX only track non player casts
 			if unit:GetCastDuration() and not unit:ShouldShowCastBar() then self.tUnits[k].shouldTrack = 1 end
 			if unit:GetCastDuration() and unit:GetCastDuration() > 0 and not unit:ShouldShowCastBar() then return end
 			if self.tUnits[k].shouldTrack and self.tUnits[k].shouldTrack == 0 then return end
@@ -214,42 +221,46 @@ function addon:OnUpdate()
 		end
 		-- buffs applied
 		local unitBuffs = unit:GetBuffs()
---		unit = GameLib.GetPlayerUnit(); D(unit:GetBuffs().arBeneficial[1].spell:GetPrerequisites())
+--		unit = GameLib.GetPlayerUnit(); D(unit:GetBuffs().arBeneficial)             [1].spell:GetPrerequisites())
 		for strBuffType, buffTypeValue  in pairs(unitBuffs) do
 			local harmful = (strBuffType == "arHarmful") and true
-			for _, s in pairs(buffTypeValue) do
-				--if pId ~= unit:GetId() then return end
-				if self.tUnits[k].buffs[s.id] then -- refresh
-					if s.fTimeRemaining > self.tUnits[k].buffs[s.id].fTimeRemaining then
-						putLineBuffApplied(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "AppliedRenewed")
-					elseif s.nCount ~= self.tUnits[k].buffs[s.id].nCount then -- this for when an aura has no duration but has stacks
-						putLineBuffApplied(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "Dose")
+			local unitType = unit:GetType()
+			if unitType and ((harmful and unitType == "Player") or (not harmful and unitType == "NonPlayer")) then -- XXX only track player debuffs and non player buffs
+				for _, s in pairs(buffTypeValue) do
+					--if pId ~= unit:GetId() then return end
+					if self.tUnits[k].buffs[s.id] then -- refresh
+						if s.fTimeRemaining > self.tUnits[k].buffs[s.id].fTimeRemaining then
+							putLineBuffApplied(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "AppliedRenewed")
+						elseif s.nCount ~= self.tUnits[k].buffs[s.id].nCount then -- this for when an aura has no duration but has stacks
+							putLineBuffApplied(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "Dose")
+						end
+						-- XXX probably don't need to keep track of everything, remove some that is not needed to improve performance
+						-- nCount and fTimeRemaining is needed so far
+						self.tUnits[k].buffs[s.id] = {
+							["unit"] = unit,
+							["id"] = s.id,
+							["nCount"] = s.nCount,
+							["fTimeRemaining"] = s.fTimeRemaining,
+							["spell"] = s.spell,
+							["harmful"] = harmful,
+						}
+					else -- first application
+						self.tUnits[k].buffs[s.id] = {
+							["unit"] = unit,
+							["id"] = s.id,
+							["nCount"] = s.nCount,
+							["fTimeRemaining"] = s.fTimeRemaining,
+							["spell"] = s.spell,
+							["harmful"] = harmful,
+						}
+						putLineBuffApplied(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "Applied")
 					end
-					-- XXX probably don't need to keep track of everything, remove some that is not needed to improve performance
-					-- nCount and fTimeRemaining is needed so far
-					self.tUnits[k].buffs[s.id] = {
-						["unit"] = unit,
-						["id"] = s.id,
-						["nCount"] = s.nCount,
-						["fTimeRemaining"] = s.fTimeRemaining,
-						["spell"] = s.spell,
-						["harmful"] = harmful,
-					}
-				else -- first application
-					self.tUnits[k].buffs[s.id] = {
-						["unit"] = unit,
-						["id"] = s.id,
-						["nCount"] = s.nCount,
-						["fTimeRemaining"] = s.fTimeRemaining,
-						["spell"] = s.spell,
-						["harmful"] = harmful,
-					}
-					putLineBuffApplied(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "Applied")
 				end
 			end
 		end
 		-- buffs removed
 		for buffId, buffData in pairs(v.buffs) do
+			-- remember right now only player debuffs and non player buffs are tracked
 			if checkForMissingBuffById(unit, buffId) then
 				putLineBuffApplied(unit, buffData.id, buffData.nCount, buffData.fTimeRemaining, buffData.spell, buffData.harmful, "Removed")
 				self.tUnits[k].buffs[buffId] = nil
