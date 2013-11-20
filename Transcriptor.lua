@@ -94,7 +94,6 @@ function addon:OnLoad()
 	self.wndAnchor:Show(false)
 	self.wndMain:FindChild("Button"):SetTooltip(tooltipText)
 	self.bLogging = false
-	self.bLocked = true
 	self.tPrevDB = {}
 	self.tDB = {}
 	tSessionDB = self.tDB
@@ -153,17 +152,15 @@ function addon:AnchorWindowMove()
 end
 
 function addon:OnLockClick()
-	if self.bLocked then
+	if self.wndAnchor:IsShown() then
+		self.wndMain:FindChild("Button"):Show(true)
+		self.wndAnchor:Show(false)
+	else
 		self.wndMain:FindChild("Button"):Show(false)
 		-- always set the anchor to be at the TranscriptorFrame before displaying it
 		local l,t,r,b = self.wndMain:GetAnchorOffsets()
 		self.wndAnchor:SetAnchorOffsets(l,t,r-30,b) -- -30 because of the lock button
 		self.wndAnchor:Show(true)
-		self.bLocked = false
-	else
-		self.wndMain:FindChild("Button"):Show(true)
-		self.wndAnchor:Show(false)
-		self.bLocked = true
 	end
 end
 
