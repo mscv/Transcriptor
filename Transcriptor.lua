@@ -90,8 +90,11 @@ function addon:OnLoad()
 	-- load our forms
 	self.wndMain = Apollo.LoadForm("Transcriptor.xml", "TranscriptorForm", nil, self)
 	self.wndMain:Show(true)
+	self.wndAnchor = Apollo.LoadForm("Transcriptor.xml", "Anchor", nil, self)
+	self.wndAnchor:Show(false)
 	self.wndMain:FindChild("Button"):SetTooltip(tooltipText)
 	self.bLogging = false
+	self.bLocked = true
 	self.tPrevDB = {}
 	self.tDB = {}
 	tSessionDB = self.tDB
@@ -144,18 +147,44 @@ function addon:OnButton()
 	end
 end
 
+function addon:AnchorWindowMove()
+	local l,t,r,b = self.wndAnchor:GetAnchorOffsets()
+	self.wndMain:SetAnchorOffsets(l,t,r+30,b) -- +30 because of the lock button
+end
+
+function addon:OnLockClick()
+	if self.bLocked then
+		self.wndMain:FindChild("Button"):Show(false)
+		-- always set the anchor to be at the TranscriptorFrame before displaying it
+		local l,t,r,b = self.wndMain:GetAnchorOffsets()
+		self.wndAnchor:SetAnchorOffsets(l,t,r-30,b) -- -30 because of the lock button
+		self.wndAnchor:Show(true)
+		self.bLocked = false
+	else
+		self.wndMain:FindChild("Button"):Show(true)
+		self.wndAnchor:Show(false)
+		self.bLocked = true
+	end
+end
+
 function addon:OnSave(eLevel)
 	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then return end
 
 	for k, v in pairs(tSessionDB) do
 		self.tPrevDB[k] = v
 	end
+	local l,t,r,b = self.wndMain:GetAnchorOffsets()
+	self.tPrevDB.tPos = { l = l, t = t, r = r, b = b}
 	return self.tPrevDB
 end
 
 function addon:OnRestore(eLevel, tData)
+	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then return end
 	-- just store this and use it later
 	self.tPrevDB = tData
+	if tData.tPos then
+		self.wndMain:SetAnchorOffsets(tData.tPos.l, tData.tPos.t, tData.tPos.r, tData.tPos.b)
+	end
 end
 
 -----------------------------------------------------------------------------------------------
