@@ -1,5 +1,6 @@
 -----------------------------------------------------------------------------------------------
 -- Transcriptor an encounter logging tool for bossmod developers
+-- Inspired by the WoW addon with the same name
 -- by Caleb calebzor@gmail.com
 -----------------------------------------------------------------------------------------------
 
@@ -96,7 +97,7 @@ function addon:OnLoad()
 	tSessionDB = self.tDB
 	self.tUnits = {}
 	-- XXX for now start logging from start
-	self:EnableLogging()
+	--self:EnableLogging()
 end
 
 function addon:EnableLogging()
@@ -104,6 +105,8 @@ function addon:EnableLogging()
 	if GameLib.GetCurrentZoneMap() then
 		zone = GameLib.GetCurrentZoneMap().strName
 	end
+	--GroupLib.GetInstanceDifficulty
+	--GroupLib.GetInstanceGameMode
 	self.sSession = ("%s - map/%s/subzone/difficulty/revision/gameVersion/buildVersion"):format(os.date(), zone) -- XXX fill these out
 	self.tDB[self.sSession] = {}
 	self.bLogging = true
@@ -288,18 +291,17 @@ function addon:OnUpdate()
 		end
 		-- buffs applied
 		local unitBuffs = unit:GetBuffs()
---		unit = GameLib.GetPlayerUnit(); D(unit:GetBuffs().arBeneficial)             [1].spell:GetPrerequisites())
 		for strBuffType, buffTypeValue  in pairs(unitBuffs) do
-			local harmful = (strBuffType == "arHarmful") and true
+			local bHarmful = (strBuffType == "arHarmful") and true or false
 			local unitType = unit:GetType()
-			if unitType and ((harmful and unitType == "Player") or (not harmful and unitType == "NonPlayer")) then -- XXX only track player debuffs and non player buffs
+			if unitType and ((bHarmful and unitType == "Player") or (not bHarmful and unitType == "NonPlayer")) then -- XXX only track player debuffs and non player buffs
 				for _, s in pairs(buffTypeValue) do
 					--if pId ~= unit:GetId() then return end
 					if self.tUnits[k].buffs[s.id] then -- refresh
 						if s.fTimeRemaining > self.tUnits[k].buffs[s.id].fTimeRemaining then
-							self:getLineBuff(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "AppliedRenewed")
+							self:getLineBuff(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, bHarmful, "AppliedRenewed")
 						elseif s.nCount ~= self.tUnits[k].buffs[s.id].nCount then -- this for when an aura has no duration but has stacks
-							self:getLineBuff(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "Dose")
+							self:getLineBuff(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, bHarmful, "Dose")
 						end
 						-- XXX probably don't need to keep track of everything, remove some that is not needed to improve performance
 						-- nCount and fTimeRemaining is needed so far
@@ -309,7 +311,7 @@ function addon:OnUpdate()
 							["nCount"] = s.nCount,
 							["fTimeRemaining"] = s.fTimeRemaining,
 							["spell"] = s.spell,
-							["harmful"] = harmful,
+							["bHarmful"] = bHarmful,
 						}
 					else -- first application
 						self.tUnits[k].buffs[s.id] = {
@@ -318,9 +320,9 @@ function addon:OnUpdate()
 							["nCount"] = s.nCount,
 							["fTimeRemaining"] = s.fTimeRemaining,
 							["spell"] = s.spell,
-							["harmful"] = harmful,
+							["bHarmful"] = bHarmful,
 						}
-						self:getLineBuff(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, harmful, "Applied")
+						self:getLineBuff(unit, s.id, s.nCount, s.fTimeRemaining, s.spell, bHarmful, "Applied")
 					end
 				end
 			end
@@ -329,7 +331,7 @@ function addon:OnUpdate()
 		for buffId, buffData in pairs(v.buffs) do
 			-- remember right now only player debuffs and non player buffs are tracked
 			if checkForMissingBuffById(unit, buffId) then
-				self:getLineBuff(unit, buffData.id, buffData.nCount, buffData.fTimeRemaining, buffData.spell, buffData.harmful, "Removed")
+				self:getLineBuff(unit, buffData.id, buffData.nCount, buffData.fTimeRemaining, buffData.spell, buffData.bHarmful, "Removed")
 				self.tUnits[k].buffs[buffId] = nil
 			end
 		end
