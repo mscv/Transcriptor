@@ -99,7 +99,7 @@ function addon:OnLoad()
 	tSessionDB = self.tDB
 	self.tUnits = {}
 	-- XXX for now start logging from start
-	--self:EnableLogging()
+	self:EnableLogging()
 end
 
 function addon:EnableLogging()
@@ -459,14 +459,15 @@ function addon:OnCombatLogTransference(tEventArgs)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogTransference"))
 end
 
+local tCombatLogModifyInterruptArmor = { "nAmount", "eCombatResult" }
+function addon:OnCombatLogModifyInterruptArmor(tEventArgs)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogModifyInterruptArmor)
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogModifyInterruptArmor"))
+end
+
 -- figure out these
 function addon:OnCombatLogDelayDeath(tEventArgs)
 	tEventArgs["strEventName"] = "CombatLogDelayDeath"
-	self:putLine(tEventArgs)
-end
-
-function addon:OnCombatLogModifyInterruptArmor(tEventArgs)
-	tEventArgs["strEventName"] = "CombatLogModifyInterruptArmor"
 	self:putLine(tEventArgs)
 end
 
