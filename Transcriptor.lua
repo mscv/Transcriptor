@@ -79,10 +79,10 @@ function addon:OnLoad()
 	Apollo.RegisterEventHandler("CombatLogPet", 					"OnCombatLogPet", self)
 	Apollo.RegisterEventHandler("UnitEnteredCombat", 				"OnEnteredCombat", self)
 	Apollo.RegisterEventHandler("ChatMessage", 						"OnChatMessage", self)
+	Apollo.RegisterEventHandler("CombatLogModifyInterruptArmor", 	"OnCombatLogModifyInterruptArmor", self)
 	-- figure these out
 	Apollo.RegisterEventHandler("CombatLogDelayDeath", 				"OnCombatLogDelayDeath", self)
 	Apollo.RegisterEventHandler("CombatLogStealth", 				"OnCombatLogStealth", self)
-	Apollo.RegisterEventHandler("CombatLogModifyInterruptArmor", 	"OnCombatLogModifyInterruptArmor", self)
 	-- this must be really resource heavy
 	Apollo.RegisterEventHandler("UnitCreated", 						"OnUnitCreated", self)
 	Apollo.RegisterEventHandler("UnitDestroyed", 					"OnUnitDestroyed", self)
@@ -375,13 +375,13 @@ function addon:OnUnitDestroyed(unit)
 	self.tUnits[unit:GetId()] = nil
 end
 
-local tCombatLogDamage = { "bTargetKilled", "nOverkill", "eEffectType", "nDamageAmount", "bPeriodic", "nShield", "nRawDamage", "eDamageType", "nAbsorption", "bTargetVulnerable", "eCombatResult" }
+local tCombatLogDamage = { "bTargetKilled", "nOverkill", "nDamageAmount", "bPeriodic", "nShield", "nRawDamage", "nAbsorption", "bTargetVulnerable", "eDamageType", "eEffectType", "eCombatResult" }
 function addon:OnCombatLogDamage(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDamage"))
 end
 
-local tCombatLogCCState = { "eResult", "strState", "eState", "nInterruptArmorHit", "eCombatResult", "bRemoved" }
+local tCombatLogCCState = { "bRemoved", "strState", "eState", "nInterruptArmorHit", "eResult", "eCombatResult" }
 function addon:OnCombatLogCCState(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogCCState"))
@@ -399,7 +399,7 @@ function addon:OnCombatLogFallingDamage(tEventArgs)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogFallingDamage"))
 end
 
-local tCombatLogHeal = { "nOverheal", "nHealAmount", "eCombatResult", "eEffectType" }
+local tCombatLogHeal = { "nOverheal", "nHealAmount", "eEffectType", "eCombatResult" }
 function addon:OnCombatLogHeal(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogHeal"))
@@ -411,13 +411,13 @@ function addon:OnEnteredCombat(unit, bInCombat)
 	end
 end
 
-local tCombatLogVitalModifier = { "bShowCombatLog", "nAmount", "eCombatResult", "eVitalType" }
+local tCombatLogVitalModifier = { "bShowCombatLog", "nAmount", "eVitalType", "eCombatResult" }
 function addon:OnCombatLogVitalModifier(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogVitalModifier"))
 end
 
-local tCombatLogInterrupted = { "eCastResult", "eCombatResult", "strCastResult" }
+local tCombatLogInterrupted = { "strCastResult" , "eCastResult", "eCombatResult" }
 function addon:OnCombatLogInterrupted(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogInterrupted"))
@@ -429,7 +429,7 @@ function addon:OnCombatLogDeflect(tEventArgs)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDeflect"))
 end
 
-local tCombatLogPet = { "bDismissed", "eCombatResult", "bKilled" }
+local tCombatLogPet = { "bKilled", "bDismissed", "eCombatResult" }
 function addon:OnCombatLogPet(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogPet)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogPet"))
@@ -447,13 +447,13 @@ function addon:OnCombatLogResurrect(tEventArgs)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogResurrect"))
 end
 
-local tCombatLogDispel = { "nInstancesRemoved", "bRemovesSingleInstance", "eCombatResult" }
+local tCombatLogDispel = { "bRemovesSingleInstance", "nInstancesRemoved", "eCombatResult" }
 function addon:OnCombatLogDispel(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDispel)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDispel"))
 end
 
-local tCombatLogTransference = { "nOverheal", "nOverkill", "nDamageAmount", "eVitalType", "nAbsorption", "nHealAmount", "eCombatResult", "eDamageType", "bTargetVulnerable", "nShield" }
+local tCombatLogTransference = { "bTargetVulnerable", "nOverheal", "nOverkill", "nDamageAmount", "nHealAmount", "nAbsorption", "nShield", "eDamageType", "eVitalType", "eCombatResult" }
 function addon:OnCombatLogTransference(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogTransference)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogTransference"))
