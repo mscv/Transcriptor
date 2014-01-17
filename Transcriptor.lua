@@ -99,7 +99,7 @@ function addon:OnLoad()
 	tSessionDB = self.tDB
 	self.tUnits = {}
 	-- XXX for now start logging from start
-	self:EnableLogging()
+	--self:EnableLogging()
 end
 
 function addon:EnableLogging()
@@ -285,13 +285,13 @@ end
 -- Event handlers
 -----------------------------------------------------------------------------------------------
 
-function addon:OnChatMessage(channelCurrent, bGM, bSelf, strSender, strRealmName, arMessageSegments, unitSource, bBubble)
+function addon:OnChatMessage(channelCurrent, bAutoResponse, bGM, bSelf, strSender, strRealmName, nPresenceState, arMessageSegments, unitSource, bShowChatBubble, bCrossFaction)
 	if checkChatFilter(channelCurrent:GetType()) then
 		local strMessage = ""
 		for _, tSegment in ipairs(arMessageSegments) do
 			strMessage = strMessage .. tSegment.strText
 		end
-		local tTextInfo = {channelCurrent:GetType(), bGM, bSelf, strSender, strRealmName, strMessage, unitSource and unitSource:GetId() or "", bBubble}
+		local tTextInfo = {channelCurrent:GetType(), bAutoResponse, bGM, bSelf, strSender, strRealmName, nPresenceState, arMessageSegments, unitSource and unitSource:GetName() or "", bShowChatBubble, bCrossFaction}
 		self:putLine(getLineFromIndexedTable(tTextInfo, "OnChatMessage"))
 	end
 end
