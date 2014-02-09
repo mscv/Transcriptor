@@ -363,8 +363,7 @@ function addon:OnUpdate()
 		for strBuffType, buffTypeValue  in pairs(unitBuffs) do
 			local bHarmful = (strBuffType == "arHarmful") and true or false
 			local unitType = unit:GetType()
-			--if unitType and ((bHarmful and unitType == "Player") or (not bHarmful and unitType == "NonPlayer")) then -- XXX only track player debuffs and non player buffs
-			if unitType and ((bHarmful and unitType == "Player") or (not bHarmful and unitType == "Player")) then -- XXX only track player debuffs and non player buffs
+			if unitType and ((bHarmful and unitType == "Player") or (not bHarmful and unitType == "NonPlayer")) then -- XXX only track player debuffs and non player buffs
 				for _, s in pairs(buffTypeValue) do
 					--if pId ~= unit:GetId() then return end
 					if self.tUnits[k].buffs[s.idBuff] then -- refresh
