@@ -273,6 +273,7 @@ local function verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues)
 	if somethingMissing then
 		return tEventArgs
 	end
+	return false
 end
 
 function addon:HelperParseEvent(tEventArgs, tEventSpecificValues)
@@ -291,13 +292,13 @@ function addon:HelperParseEvent(tEventArgs, tEventSpecificValues)
 		end
 	end
 	-- XXX should do something if there is a missmatch between the tEventSpecificValues and the tEventArgs
-	if verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues) then
-		tInfo = verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues)
-	else
+	--if verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues) then
+	--	tInfo = verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues)
+	--else
 		for k, v in ipairs(tEventSpecificValues) do
 			tInfo[#tInfo+1] = tEventArgs[v]
 		end
-	end
+	--end
 	return tInfo
 end
 
