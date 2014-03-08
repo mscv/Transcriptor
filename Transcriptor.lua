@@ -57,6 +57,8 @@ function addon:new(o)
 	return o
 end
 
+local tMissmatchingArgs = {}
+
 function addon:Init()
 	Apollo.RegisterAddon(self)
 end
@@ -173,6 +175,8 @@ function addon:OnSave(eLevel)
 	local l,t,r,b = self.wndMain:GetAnchorOffsets()
 	self.tPrevDB.tPos = { l = l, t = t, r = r, b = b}
 	self.tPrevDB.bLogOnLogin = self.bLogging
+
+	self.tPrevDB.tMissmatchingArgs = tMissmatchingArgs
 	return self.tPrevDB
 end
 
@@ -248,6 +252,13 @@ end
 
 local tCasterTargetSpell = { "unitCaster", "unitTarget", "splCallingSpell" }
 
+local function trackMissmatchingArg(sEvent, sArg, sFrom)
+	if not tMissmatchingArgs[sEvent] then
+		tMissmatchingArgs[sEvent] = {}
+	end
+	tMissmatchingArgs[sEvent][sArg] = sFrom
+end
+
 local function checkForMissingKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues, sEvent)
 	for k, _ in pairs(tEventArgs) do
 		local bKeyNotMissing
@@ -258,8 +269,9 @@ local function checkForMissingKeysIn_tEventSpecificValues(tEventArgs, tEventSpec
 				break
 			end
 		end
-		if k == "unitCaster" or k == "unitTarget" or k == "splCallingSpell" then bKeyNotMissing = true end
+		if k == "unitCaster" or k == "unitTarget" or k == "splCallingSpell" or k == "unitCasterOwner" or k == "unitTargetOwner" then bKeyNotMissing = true end
 		if not bKeyNotMissing then
+			trackMissmatchingArg(sEvent, k, "tEventSpecificValues") -- aka missing from our indexed list
 			return true
 		end
 	end
@@ -267,15 +279,18 @@ local function checkForMissingKeysIn_tEventSpecificValues(tEventArgs, tEventSpec
 end
 
 local function checkForRenamedOrRemovedKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues, sEvent)
-	for k, v in ipairs(tEventSpecificValues) do
+	for _, k in ipairs(tEventSpecificValues) do
 		local bKeyNotMissing
 		for sEventArgKey, _ in pairs(tEventArgs) do
-			if sEventArgKey == v then
+			if sEventArgKey == k then
 				bKeyNotMissing = true
 				break
 			end
 		end
+		if k == "unitCasterOwner" or k == "strTriggerCapCategory" or k == "unitTargetOwner" then bKeyNotMissing = true end
+		if sEvent == "CombatLogTransference" and ( k == "nHealAmount" or k == "nOverheal" or k == "eVitalType" ) then bKeyNotMissing = true end
 		if not bKeyNotMissing then
+			trackMissmatchingArg(sEvent, k, "tEventArgs") -- aka it is an extra in our indexed list
 			return true
 		end
 	end
@@ -318,9 +333,13 @@ function addon:HelperParseEvent(tEventArgs, tEventSpecificValues, sEvent)
 		tInfo = verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues, sEvent)
 	else
 		for k, v in ipairs(tEventSpecificValues) do
-			if v == "unitTargetOwner" then
+			if v == "unitTargetOwner" or v == "unitCasterOwner" then
 				tInfo[#tInfo+1] = self:HelperGetName(tEventArgs[v])
 				tInfo[#tInfo+1] = self:HelperGetId(tEventArgs[v])
+			elseif v == "tHealData" then
+				tInfo[#tInfo+1] = tEventArgs[v].nHealAmount
+				tInfo[#tInfo+1] = tEventArgs[v].nOverHeal
+				tInfo[#tInfo+1] = tEventArgs[v].eVitalType
 			else
 				tInfo[#tInfo+1] = tEventArgs[v]
 			end
@@ -446,7 +465,8 @@ function addon:OnUnitDestroyed(unit)
 	self.tUnits[unit:GetId()] = nil
 end
 
-local tCombatLogDamage = { "bTargetKilled", "nOverkill", "nDamageAmount", "bPeriodic", "nShield", "nRawDamage", "nAbsorption", "bTargetVulnerable", "eDamageType", "eEffectType", "eCombatResult" }
+--<N F="26" T="s" V="18:28:51#CombatLogDamage#eEffectType:8#bTargetKilled:false#nOverkill:0#bPeriodic:false#splCallingSpell:userdata: 00000001D75258F0#nDamageAmount:643#unitCasterOwner:userdata: 00000001D75255F0#unitCaster:userdata: 00000001D75250B0#nRawDamage:716#nShield:0#eCombatResult:2#nAbsorption:0#bTargetVulnerable:true#unitTarget:userdata: 00000001D75256F0#eDamageType:2"/>
+local tCombatLogDamage = { "unitCasterOwner", "unitTargetOwner", "bTargetKilled", "nOverkill", "nDamageAmount", "bPeriodic", "nShield", "nRawDamage", "nAbsorption", "bTargetVulnerable", "eDamageType", "eEffectType", "eCombatResult" }
 function addon:OnCombatLogDamage(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage, "CombatLogDamage")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDamage"))
@@ -470,7 +490,7 @@ function addon:OnCombatLogFallingDamage(tEventArgs)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogFallingDamage"))
 end
 
-local tCombatLogHeal = { "nOverheal", "nHealAmount", "eEffectType", "eCombatResult" }
+local tCombatLogHeal = { "unitCasterOwner", "nOverheal", "nHealAmount", "eEffectType", "eCombatResult" }
 function addon:OnCombatLogHeal(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogHeal, "CombatLogHeal")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogHeal"))
@@ -494,7 +514,7 @@ function addon:OnCombatLogInterrupted(tEventArgs)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogInterrupted"))
 end
 
-local tCombatLogDeflect = { "eCombatResult" }
+local tCombatLogDeflect = { "unitCasterOwner", "eCombatResult" }
 function addon:OnCombatLogDeflect(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDeflect, "CombatLogDeflect")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDeflect"))
@@ -524,7 +544,7 @@ function addon:OnCombatLogDispel(tEventArgs)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDispel"))
 end
 
-local tCombatLogTransference = { "bTargetVulnerable", "nOverheal", "nOverkill", "nDamageAmount", "nHealAmount", "nAbsorption", "nShield", "eDamageType", "eVitalType", "eCombatResult" }
+local tCombatLogTransference = { "tHealData", "bTargetVulnerable", "nOverheal", "nOverkill", "nDamageAmount", "nHealAmount", "nAbsorption", "nShield", "eDamageType", "eVitalType", "eCombatResult" }
 function addon:OnCombatLogTransference(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogTransference, "CombatLogTransference")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogTransference"))
