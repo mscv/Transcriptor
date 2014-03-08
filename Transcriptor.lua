@@ -4,7 +4,7 @@
 -- by Caleb calebzor@gmail.com
 -----------------------------------------------------------------------------------------------
 
-local gameVersion, buildVersion = "Winter beta 3", "1.0.0.6505"
+local gameVersion, buildVersion = "Winter beta 3", "1.0.0.6550"
 
 require "Window"
 require "GameLib"
@@ -192,8 +192,15 @@ end
 -- Utility
 -----------------------------------------------------------------------------------------------
 
-local function getLineFromIndexedTable(t, strEvent)
-	local s = ("%s#%s"):format(os.date("%H:%M:%S"), strEvent)
+local function getLineFromIndexedTable(t, sEvent)
+	local s = ("%s#%s"):format(os.date("%H:%M:%S"), sEvent)
+
+	if not t[1] then -- not an indexed table that we generated
+		for k, v in pairs(t) do
+			s = ("%s#%s:%s"):format(s, tostring(k), tostring(v) or "")
+		end
+	end
+
 	for k, v in ipairs(t) do
 		s = ("%s#%s"):format(s, tostring(v) or "")
 	end
@@ -205,7 +212,7 @@ function addon:putLine(str)
 	self.tDB[self.sSession][#self.tDB[self.sSession]+1] = str
 end
 
-function addon:getLineBuff(unit, id, nCount, fTimeRemaining, splEffect, bHarmful, strEventType)
+function addon:getLineBuff(unit, id, nCount, fTimeRemaining, splEffect, bHarmful, sEventType)
 	if fTimeRemaining and fTimeRemaining == 4294967.5 then -- assume this is infinite (~50 days)
 		fTimeRemaining = "inf"
 	end
@@ -223,8 +230,8 @@ function addon:getLineBuff(unit, id, nCount, fTimeRemaining, splEffect, bHarmful
 	--	end
 	--end
 	-- XXX look into GetAOETargetInfo and GetPrerequisites
-	local strEvent = (bHarmful and "Debuff" or "Buff") .. strEventType
-	self:putLine(getLineFromIndexedTable(tTextInfo, strEvent))
+	local sEvent = (bHarmful and "Debuff" or "Buff") .. sEventType
+	self:putLine(getLineFromIndexedTable(tTextInfo, sEvent))
 end
 
 local function checkForMissingBuffById(unit, id)
@@ -241,42 +248,57 @@ end
 
 local tCasterTargetSpell = { "unitCaster", "unitTarget", "splCallingSpell" }
 
-local function checkForMissingKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues)
+local function checkForMissingKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues, sEvent)
 	for k, _ in pairs(tEventArgs) do
-		for _, strEventArgKey in ipairs(tEventSpecificValues) do
-			if k == strEventArgKey then
-				return true
+		local bKeyNotMissing
+
+		for _, sEventArgKey in ipairs(tEventSpecificValues) do
+			if k == sEventArgKey then
+				bKeyNotMissing = true
+				break
 			end
 		end
-	end
-	return false
-end
-
-local function checkForRenamedOrRemovedKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues)
-	for k, v in ipairs(tEventSpecificValues) do
-		if not tEventArgs[v] then
+		if k == "unitCaster" or k == "unitTarget" or k == "splCallingSpell" then bKeyNotMissing = true end
+		if not bKeyNotMissing then
 			return true
 		end
 	end
 	return false
 end
 
-local function verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues)
-	local somethingMissing
-
-	somethingMissing = checkForMissingKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues)
-	if somethingMissing then
-		return tEventArgs
-	end
-
-	somethingMissing = checkForRenamedOrRemovedKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues)
-	if somethingMissing then
-		return tEventArgs
+local function checkForRenamedOrRemovedKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues, sEvent)
+	for k, v in ipairs(tEventSpecificValues) do
+		local bKeyNotMissing
+		for sEventArgKey, _ in pairs(tEventArgs) do
+			if sEventArgKey == v then
+				bKeyNotMissing = true
+				break
+			end
+		end
+		if not bKeyNotMissing then
+			return true
+		end
 	end
 	return false
 end
 
-function addon:HelperParseEvent(tEventArgs, tEventSpecificValues)
+local function verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues, sEvent)
+	local somethingMissing
+
+	somethingMissing = checkForMissingKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues, sEvent)
+	if somethingMissing then
+		return tEventArgs
+	end
+
+	somethingMissing = checkForRenamedOrRemovedKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues, sEvent)
+	if somethingMissing then
+		return tEventArgs
+	end
+
+	return false
+end
+
+function addon:HelperParseEvent(tEventArgs, tEventSpecificValues, sEvent)
 	-- sSourceName, nSourceId, sDestName, nDestId, sSpellName, nSpellId,
 	-- bTargetKilled, nOverkill, eEffectType, nDamageAmount, bPeriodic, nShield, nRawDamage, eDamageType, nAbsorption, bTargetVulnerable, eCombatResult
 	local tInfo = {}
@@ -292,13 +314,18 @@ function addon:HelperParseEvent(tEventArgs, tEventSpecificValues)
 		end
 	end
 	-- XXX should do something if there is a missmatch between the tEventSpecificValues and the tEventArgs
-	--if verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues) then
-	--	tInfo = verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues)
-	--else
+	if verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues, sEvent) then
+		tInfo = verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues, sEvent)
+	else
 		for k, v in ipairs(tEventSpecificValues) do
-			tInfo[#tInfo+1] = tEventArgs[v]
+			if v == "unitTargetOwner" then
+				tInfo[#tInfo+1] = self:HelperGetName(tEventArgs[v])
+				tInfo[#tInfo+1] = self:HelperGetId(tEventArgs[v])
+			else
+				tInfo[#tInfo+1] = tEventArgs[v]
+			end
 		end
-	--end
+	end
 	return tInfo
 end
 
@@ -335,7 +362,7 @@ function addon:OnChatMessage(channelCurrent, bAutoResponse, bGM, bSelf, strSende
 		for _, tSegment in ipairs(arMessageSegments) do
 			strMessage = strMessage .. tSegment.strText
 		end
-		local tTextInfo = {channelCurrent:GetType(), bAutoResponse, bGM, bSelf, strSender, strRealmName, nPresenceState, arMessageSegments, unitSource and unitSource:GetName() or "", bShowChatBubble, bCrossFaction}
+		local tTextInfo = {channelCurrent:GetType(), bAutoResponse, bGM, bSelf, strSender, strRealmName, nPresenceState, strMessage, unitSource and unitSource:GetName() or "", bShowChatBubble, bCrossFaction}
 		self:putLine(getLineFromIndexedTable(tTextInfo, "OnChatMessage"))
 	end
 end
@@ -421,31 +448,31 @@ end
 
 local tCombatLogDamage = { "bTargetKilled", "nOverkill", "nDamageAmount", "bPeriodic", "nShield", "nRawDamage", "nAbsorption", "bTargetVulnerable", "eDamageType", "eEffectType", "eCombatResult" }
 function addon:OnCombatLogDamage(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage, "CombatLogDamage")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDamage"))
 end
 
-local tCombatLogCCState = { "bRemoved", "strState", "eState", "nInterruptArmorHit", "eResult", "eCombatResult" }
+local tCombatLogCCState = { "strTriggerCapCategory", "bRemoved", "strState", "eState", "nInterruptArmorHit", "eResult", "eCombatResult" }
 function addon:OnCombatLogCCState(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogCCState, "CombatLogCCState")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogCCState"))
 end
 
 local tCombatLogCCStateBreak = { "strState", "eState" }
 function addon:OnCombatLogCCStateBreak(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogCCStateBreak)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogCCStateBreak, "CombatLogCCStateBreak")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogCCStateBreak"))
 end
 
 local tCombatLogFallingDamage = { "nDamageAmount" }
 function addon:OnCombatLogFallingDamage(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogFallingDamage)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogFallingDamage, "CombatLogFallingDamage")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogFallingDamage"))
 end
 
 local tCombatLogHeal = { "nOverheal", "nHealAmount", "eEffectType", "eCombatResult" }
 function addon:OnCombatLogHeal(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogHeal, "CombatLogHeal")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogHeal"))
 end
 
@@ -457,71 +484,71 @@ end
 
 local tCombatLogVitalModifier = { "bShowCombatLog", "nAmount", "eVitalType", "eCombatResult" }
 function addon:OnCombatLogVitalModifier(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogVitalModifier, "CombatLogVitalModifier")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogVitalModifier"))
 end
 
-local tCombatLogInterrupted = { "strCastResult" , "eCastResult", "eCombatResult" }
+local tCombatLogInterrupted = { "splInterruptingSpell", "splCallingSpell", "strCastResult" , "eCastResult", "eCombatResult" } -- unitTarget, unitCaster
 function addon:OnCombatLogInterrupted(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogInterrupted, "CombatLogInterrupted")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogInterrupted"))
 end
 
 local tCombatLogDeflect = { "eCombatResult" }
 function addon:OnCombatLogDeflect(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDamage)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDeflect, "CombatLogDeflect")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDeflect"))
 end
 
-local tCombatLogPet = { "bKilled", "bDismissed", "eCombatResult" }
+local tCombatLogPet = { "unitTargetOwner", "bKilled", "bDismissed", "eCombatResult" }
 function addon:OnCombatLogPet(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogPet)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogPet, "CombatLogPet")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogPet"))
 end
 
 local tCombatLogDeath = { "" }
 function addon:OnCombatLogDeath(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDeath)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDeath, "CombatLogDeath")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDeath"))
 end
 
 local tCombatLogResurrect = { "" }
 function addon:OnCombatLogResurrect(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogResurrect)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogResurrect, "CombatLogResurrect")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogResurrect"))
 end
 
 local tCombatLogDispel = { "bRemovesSingleInstance", "nInstancesRemoved", "eCombatResult" }
 function addon:OnCombatLogDispel(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDispel)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDispel, "CombatLogDispel")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDispel"))
 end
 
 local tCombatLogTransference = { "bTargetVulnerable", "nOverheal", "nOverkill", "nDamageAmount", "nHealAmount", "nAbsorption", "nShield", "eDamageType", "eVitalType", "eCombatResult" }
 function addon:OnCombatLogTransference(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogTransference)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogTransference, "CombatLogTransference")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogTransference"))
 end
 
 local tCombatLogModifyInterruptArmor = { "nAmount", "eCombatResult" }
 function addon:OnCombatLogModifyInterruptArmor(tEventArgs)
-	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogModifyInterruptArmor)
+	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogModifyInterruptArmor, "CombatLogModifyInterruptArmor")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogModifyInterruptArmor"))
 end
 
 -- figure out these
 function addon:OnCombatLogDelayDeath(tEventArgs)
-	tEventArgs["strEventName"] = "CombatLogDelayDeath"
+	tEventArgs["sEventName"] = "CombatLogDelayDeath"
 	self:putLine(tEventArgs)
 end
 
 function addon:OnCombatLogImmunity(tEventArgs)
-	tEventArgs["strEventName"] = "CombatLogImmunity"
+	tEventArgs["sEventName"] = "CombatLogImmunity"
 	self:putLine(tEventArgs)
 end
 
 function addon:OnCombatLogStealth(tEventArgs)
-	tEventArgs["strEventName"] = "CombatLogStealth"
+	tEventArgs["sEventName"] = "CombatLogStealth"
 	self:putLine(tEventArgs)
 end
 
