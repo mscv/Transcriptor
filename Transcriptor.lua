@@ -4,7 +4,7 @@
 -- by Caleb calebzor@gmail.com
 -----------------------------------------------------------------------------------------------
 
-local gameVersion, buildVersion = "Winter beta 3", "1.0.0.6550"
+local gameVersion, buildVersion = "Preorder Weekend 2", "1.0.0.6610"
 
 require "Window"
 require "GameLib"
@@ -333,7 +333,7 @@ function addon:HelperParseEvent(tEventArgs, tEventSpecificValues, sEvent)
 		tInfo = verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues, sEvent)
 	else
 		for k, v in ipairs(tEventSpecificValues) do
-			if v == "unitTargetOwner" or v == "unitCasterOwner" then
+			if v == "unitTargetOwner" or v == "unitCasterOwner" or v == "splInterruptingSpell" or v == "splRemovedSpell" then
 				tInfo[#tInfo+1] = self:HelperGetName(tEventArgs[v])
 				tInfo[#tInfo+1] = self:HelperGetId(tEventArgs[v])
 			elseif v == "tHealData" then
@@ -508,7 +508,7 @@ function addon:OnCombatLogVitalModifier(tEventArgs)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogVitalModifier"))
 end
 
-local tCombatLogInterrupted = { "splInterruptingSpell", "splCallingSpell", "strCastResult" , "eCastResult", "eCombatResult" } -- unitTarget, unitCaster
+local tCombatLogInterrupted = { "splInterruptingSpell", "strCastResult" , "eCastResult", "eCombatResult" } -- unitTarget, unitCaster
 function addon:OnCombatLogInterrupted(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogInterrupted, "CombatLogInterrupted")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogInterrupted"))
@@ -538,7 +538,7 @@ function addon:OnCombatLogResurrect(tEventArgs)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogResurrect"))
 end
 
-local tCombatLogDispel = { "bRemovesSingleInstance", "nInstancesRemoved", "eCombatResult" }
+local tCombatLogDispel = { "splRemovedSpell", "bRemovesSingleInstance", "nInstancesRemoved", "eCombatResult" }
 function addon:OnCombatLogDispel(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDispel, "CombatLogDispel")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDispel"))
