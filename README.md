@@ -1,4 +1,4 @@
 Transcriptor
 ============
 
-There's nothing here!
+Logging utility for boss encounters.
