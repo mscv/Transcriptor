@@ -4,7 +4,7 @@
 -- by Caleb calebzor@gmail.com
 -----------------------------------------------------------------------------------------------
 
-local gameVersion, buildVersion = "Preorder Weekend 2", "1.0.0.6610"
+local gameVersion, buildVersion = "Live", "1.0.0.6851"
 
 require "Window"
 require "GameLib"
@@ -375,13 +375,13 @@ end
 -- Event handlers
 -----------------------------------------------------------------------------------------------
 
-function addon:OnChatMessage(channelCurrent, bAutoResponse, bGM, bSelf, strSender, strRealmName, nPresenceState, arMessageSegments, unitSource, bShowChatBubble, bCrossFaction)
+function addon:OnChatMessage(channelCurrent, tMessage)
 	if checkChatFilter(channelCurrent:GetType()) then
 		local strMessage = ""
-		for _, tSegment in ipairs(arMessageSegments) do
+		for _, tSegment in ipairs(tMessage.arMessageSegments) do
 			strMessage = strMessage .. tSegment.strText
 		end
-		local tTextInfo = {channelCurrent:GetType(), bAutoResponse, bGM, bSelf, strSender, strRealmName, nPresenceState, strMessage, unitSource and unitSource:GetName() or "", bShowChatBubble, bCrossFaction}
+		local tTextInfo = {channelCurrent:GetType(), tMessage.bAutoResponse, tMessage.bGM, tMessage.bSelf, tMessage.strSender, tMessage.strRealmName, tMessage.nPresenceState, strMessage, tMessage.unitSource and tMessage.unitSource:GetName() or "", tMessage.bShowChatBubble, tMessage.bCrossFaction}
 		self:putLine(getLineFromIndexedTable(tTextInfo, "OnChatMessage"))
 	end
 end
@@ -555,6 +555,7 @@ function addon:OnCombatLogModifyInterruptArmor(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogModifyInterruptArmor, "CombatLogModifyInterruptArmor")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogModifyInterruptArmor"))
 end
+
 
 -- figure out these
 function addon:OnCombatLogDelayDeath(tEventArgs)
