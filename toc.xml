@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
-<Addon Author="Caleb" APIVersion="6" Name="Transcriptor" Description="Logging utility for boss encounters." Version="0.13">
+<Addon Author="Caleb" APIVersion="9" Name="Transcriptor" Description="Logging utility for boss encounters." Version="0.14">
     <Script Name="Transcriptor.lua" />
     <Form Name="Transcriptor.xml" />
 </Addon>
