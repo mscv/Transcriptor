@@ -66,31 +66,6 @@ end
 -- OnLoad and Enabling stuff
 -----------------------------------------------------------------------------------------------
 function addon:OnLoad()
-	-- register events
-	Apollo.RegisterEventHandler("CombatLogDamage", 					"OnCombatLogDamage", self)
-	Apollo.RegisterEventHandler("CombatLogCCState", 				"OnCombatLogCCState", self)
-	Apollo.RegisterEventHandler("CombatLogCCStateBreak", 			"OnCombatLogCCStateBreak", self)
-	Apollo.RegisterEventHandler("CombatLogFallingDamage", 			"OnCombatLogFallingDamage", self)
-	Apollo.RegisterEventHandler("CombatLogHeal", 					"OnCombatLogHeal", self)
-	Apollo.RegisterEventHandler("CombatLogDispel", 					"OnCombatLogDispel", self)
-	Apollo.RegisterEventHandler("CombatLogTransference", 			"OnCombatLogTransference", self)
-	Apollo.RegisterEventHandler("CombatLogVitalModifier", 			"OnCombatLogVitalModifier", self)
-	Apollo.RegisterEventHandler("CombatLogDeflect", 				"OnCombatLogDeflect", self)
-	Apollo.RegisterEventHandler("CombatLogImmunity", 				"OnCombatLogImmunity", self)
-	Apollo.RegisterEventHandler("CombatLogInterrupted", 			"OnCombatLogInterrupted", self)
-	Apollo.RegisterEventHandler("CombatLogDeath", 					"OnCombatLogDeath", self)
-	Apollo.RegisterEventHandler("CombatLogResurrect", 				"OnCombatLogResurrect", self)
-	Apollo.RegisterEventHandler("CombatLogPet", 					"OnCombatLogPet", self)
-	Apollo.RegisterEventHandler("UnitEnteredCombat", 				"OnEnteredCombat", self)
-	Apollo.RegisterEventHandler("ChatMessage", 						"OnChatMessage", self)
-	Apollo.RegisterEventHandler("CombatLogModifyInterruptArmor", 	"OnCombatLogModifyInterruptArmor", self)
-	-- figure these out
-	Apollo.RegisterEventHandler("CombatLogDelayDeath", 				"OnCombatLogDelayDeath", self)
-	Apollo.RegisterEventHandler("CombatLogStealth", 				"OnCombatLogStealth", self)
-	-- this must be really resource heavy
-	Apollo.RegisterEventHandler("UnitCreated", 						"OnUnitCreated", self)
-	Apollo.RegisterEventHandler("UnitDestroyed", 					"OnUnitDestroyed", self)
-	Apollo.RegisterEventHandler("NextFrame", 						"OnUpdate", self)
 	-- load our forms
 	self.wndMain = Apollo.LoadForm("Transcriptor.xml", "TranscriptorForm", nil, self)
 	self.wndMain:Show(true)
@@ -109,18 +84,60 @@ function addon:EnableLogging()
 	if GameLib.GetCurrentZoneMap() then
 		zone = GameLib.GetCurrentZoneMap().strName
 	end
-	--GroupLib.GetInstanceDifficulty
-	--GroupLib.GetInstanceGameMode
 	self.sSession = ("%s - %s/%s/%s/%s/%s/%s/%s"):format(os.date(), "map", zone, "subzone", GameLib.GetWorldDifficulty(), "revision", gameVersion, buildVersion) -- XXX fill these out
 	self.tDB[self.sSession] = {}
 	self.bLogging = true
 	self.wndMain:GetChildren()[1]:SetText("Transcriptor: On")
+
+	-- register events
+	Apollo.RegisterEventHandler("CombatLogDamage", 					"OnCombatLogDamage", self)
+	Apollo.RegisterEventHandler("CombatLogCCState", 				"OnCombatLogCCState", self)
+	Apollo.RegisterEventHandler("CombatLogCCStateBreak", 			"OnCombatLogCCStateBreak", self)
+	Apollo.RegisterEventHandler("CombatLogFallingDamage", 			"OnCombatLogFallingDamage", self)
+	Apollo.RegisterEventHandler("CombatLogHeal", 					"OnCombatLogHeal", self)
+	Apollo.RegisterEventHandler("CombatLogDispel", 					"OnCombatLogDispel", self)
+	Apollo.RegisterEventHandler("CombatLogTransference", 			"OnCombatLogTransference", self)
+	Apollo.RegisterEventHandler("CombatLogVitalModifier", 			"OnCombatLogVitalModifier", self)
+	Apollo.RegisterEventHandler("CombatLogDeflect", 				"OnCombatLogDeflect", self)
+	Apollo.RegisterEventHandler("CombatLogImmunity", 				"OnCombatLogImmunity", self)
+	Apollo.RegisterEventHandler("CombatLogInterrupted", 			"OnCombatLogInterrupted", self)
+	Apollo.RegisterEventHandler("CombatLogDeath", 					"OnCombatLogDeath", self)
+	Apollo.RegisterEventHandler("CombatLogResurrect", 				"OnCombatLogResurrect", self)
+	Apollo.RegisterEventHandler("CombatLogPet", 					"OnCombatLogPet", self)
+	Apollo.RegisterEventHandler("UnitEnteredCombat", 				"OnEnteredCombat", self)
+	Apollo.RegisterEventHandler("ChatMessage", 						"OnChatMessage", self)
+	Apollo.RegisterEventHandler("CombatLogModifyInterruptArmor", 	"OnCombatLogModifyInterruptArmor", self)
+	Apollo.RegisterEventHandler("CombatLogDelayDeath", 				"OnCombatLogDelayDeath", self)
+	Apollo.RegisterEventHandler("CombatLogStealth", 				"OnCombatLogStealth", self)
+	Apollo.RegisterEventHandler("NextFrame", 						"OnUpdate", self)
 end
 
 function addon:DisableLogging()
 	self.sSession = nil
 	self.bLogging = false
 	self.wndMain:GetChildren()[1]:SetText("Transcriptor: Off")
+	
+	-- unregister events
+	Apollo.RemoveEventHandler("CombatLogDamage",				self)
+	Apollo.RemoveEventHandler("CombatLogCCState",				self)
+	Apollo.RemoveEventHandler("CombatLogCCStateBreak",			self)
+	Apollo.RemoveEventHandler("CombatLogFallingDamage",			self)
+	Apollo.RemoveEventHandler("CombatLogHeal",					self)
+	Apollo.RemoveEventHandler("CombatLogDispel",				self)
+	Apollo.RemoveEventHandler("CombatLogTransference",			self)
+	Apollo.RemoveEventHandler("CombatLogVitalModifier",			self)
+	Apollo.RemoveEventHandler("CombatLogDeflect",				self)
+	Apollo.RemoveEventHandler("CombatLogImmunity",				self)
+	Apollo.RemoveEventHandler("CombatLogInterrupted",			self)
+	Apollo.RemoveEventHandler("CombatLogDeath",					self)
+	Apollo.RemoveEventHandler("CombatLogResurrect",				self)
+	Apollo.RemoveEventHandler("CombatLogPet",					self)
+	Apollo.RemoveEventHandler("UnitEnteredCombat",				self)
+	Apollo.RemoveEventHandler("ChatMessage",					self)
+	Apollo.RemoveEventHandler("CombatLogModifyInterruptArmor",	self)
+	Apollo.RemoveEventHandler("CombatLogDelayDeath",			self)
+	Apollo.RemoveEventHandler("CombatLogStealth",				self)
+	Apollo.RemoveEventHandler("NextFrame",						self)
 end
 
 -----------------------------------------------------------------------------------------------
@@ -212,7 +229,6 @@ local function getLineFromIndexedTable(t, sEvent)
 end
 
 function addon:putLine(str)
-	if not self.bLogging then return end
 	self.tDB[self.sSession][#self.tDB[self.sSession]+1] = str
 end
 
@@ -499,6 +515,12 @@ end
 function addon:OnEnteredCombat(unit, bInCombat)
 	if unit == GameLib.GetPlayerUnit() then
 		self:putLine(("%s#%s#%s"):format(os.date("%H:%M:%S"), "PlayerEnteredCombat", tostring(bInCombat)))
+	end
+
+	if bInCombat and not self.tUnits[unit:GetId()] then
+		self:OnUnitCreated(unit)
+	elseif not bInCombat then
+		self:OnUnitDestroyed(unit)
 	end
 end
 
