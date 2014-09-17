@@ -217,13 +217,14 @@ local function getLineFromIndexedTable(t, sEvent)
 	local s = ("%s#%s"):format(os.date("%H:%M:%S"), sEvent)
 
 	if not t[1] then -- not an indexed table that we generated
+		s = ("%s#%s"):format(s, 'MISSING_ARGUEMENTS')
 		for k, v in pairs(t) do
 			s = ("%s#%s:%s"):format(s, tostring(k), tostring(v) or "")
 		end
-	end
-
-	for k, v in ipairs(t) do
-		s = ("%s#%s"):format(s, tostring(v) or "")
+	else
+		for k, v in ipairs(t) do
+			s = ("%s#%s"):format(s, tostring(v) or "")
+		end
 	end
 	return s
 end
@@ -276,6 +277,7 @@ local function trackMissmatchingArg(sEvent, sArg, sFrom)
 end
 
 local function checkForMissingKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues, sEvent)
+	local bKeysMissing = false
 	for k, _ in pairs(tEventArgs) do
 		local bKeyNotMissing
 
@@ -288,13 +290,14 @@ local function checkForMissingKeysIn_tEventSpecificValues(tEventArgs, tEventSpec
 		if k == "unitCaster" or k == "unitTarget" or k == "splCallingSpell" or k == "unitCasterOwner" or k == "unitTargetOwner" then bKeyNotMissing = true end
 		if not bKeyNotMissing then
 			trackMissmatchingArg(sEvent, k, "tEventSpecificValues") -- aka missing from our indexed list
-			return true
+			bKeysMissing = true
 		end
 	end
-	return false
+	return bKeysMissing
 end
 
 local function checkForRenamedOrRemovedKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues, sEvent)
+	local bKeysMissing = false
 	for _, k in ipairs(tEventSpecificValues) do
 		local bKeyNotMissing
 		for sEventArgKey, _ in pairs(tEventArgs) do
@@ -307,10 +310,10 @@ local function checkForRenamedOrRemovedKeysIn_tEventSpecificValues(tEventArgs, t
 		if sEvent == "CombatLogTransference" and ( k == "nHealAmount" or k == "nOverheal" or k == "eVitalType" ) then bKeyNotMissing = true end
 		if not bKeyNotMissing then
 			trackMissmatchingArg(sEvent, k, "tEventArgs") -- aka it is an extra in our indexed list
-			return true
+			bKeysMissing = true
 		end
 	end
-	return false
+	return bKeysMissing
 end
 
 local function verifyNoEventsArgMissmatch(tEventArgs, tEventSpecificValues, sEvent)
