@@ -540,6 +540,11 @@ end
 
 local tCombatLogInterrupted = { "splInterruptingSpell", "strCastResult" , "eCastResult", "eCombatResult" } -- unitTarget, unitCaster
 function addon:OnCombatLogInterrupted(tEventArgs)
+	-- ignore self interrupts (i.e. jumping midcast etc.)
+	if not tEventArgs or not tEventArgs.unitCaster or tEventArgs.unitCaster == tEventArgs.unitTarget then
+		return
+	end
+	
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogInterrupted, "CombatLogInterrupted")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogInterrupted"))
 end
