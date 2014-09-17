@@ -287,7 +287,7 @@ local function checkForRenamedOrRemovedKeysIn_tEventSpecificValues(tEventArgs, t
 				break
 			end
 		end
-		if k == "unitCasterOwner" or k == "strTriggerCapCategory" or k == "unitTargetOwner" then bKeyNotMissing = true end
+		if k == "unitCasterOwner" or k == "strTriggerCapCategory" or k == "unitTargetOwner" or k == "bHideFloater" then bKeyNotMissing = true end
 		if sEvent == "CombatLogTransference" and ( k == "nHealAmount" or k == "nOverheal" or k == "eVitalType" ) then bKeyNotMissing = true end
 		if not bKeyNotMissing then
 			trackMissmatchingArg(sEvent, k, "tEventArgs") -- aka it is an extra in our indexed list
@@ -472,7 +472,7 @@ function addon:OnCombatLogDamage(tEventArgs)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDamage"))
 end
 
-local tCombatLogCCState = { "strTriggerCapCategory", "bRemoved", "strState", "eState", "nInterruptArmorHit", "eResult", "eCombatResult" }
+local tCombatLogCCState = { "strTriggerCapCategory", "bRemoved", "strState", "eState", "nInterruptArmorHit", "eResult", "eCombatResult", "bHideFloater" }
 function addon:OnCombatLogCCState(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogCCState, "CombatLogCCState")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogCCState"))
@@ -555,7 +555,6 @@ function addon:OnCombatLogModifyInterruptArmor(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogModifyInterruptArmor, "CombatLogModifyInterruptArmor")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogModifyInterruptArmor"))
 end
-
 
 -- figure out these
 function addon:OnCombatLogDelayDeath(tEventArgs)
