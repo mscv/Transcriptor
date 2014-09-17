@@ -504,6 +504,11 @@ end
 
 local tCombatLogVitalModifier = { "bShowCombatLog", "nAmount", "eVitalType", "eCombatResult" }
 function addon:OnCombatLogVitalModifier(tEventArgs)
+	-- ignore resource gains from players and resource gains where no actors are available
+	if not tEventArgs or not tEventArgs.unitCaster or tEventArgs.unitCaster:IsACharacter() then
+		return
+	end
+
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogVitalModifier, "CombatLogVitalModifier")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogVitalModifier"))
 end
