@@ -568,8 +568,11 @@ function addon:OnCombatLogDispel(tEventArgs)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDispel"))
 end
 
-local tCombatLogModifyInterruptArmor = { "nAmount", "eCombatResult" }
+local tCombatLogModifyInterruptArmor = { "splCallingSpell", "nAmount", "eCombatResult" }
 function addon:OnCombatLogModifyInterruptArmor(tEventArgs)
+	-- fix for event w/o actors or nAmount
+	if not tEventArgs.unitCaster or not tEventArgs.unitTarget or not tEventArgs.nAmount then return end
+	
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogModifyInterruptArmor, "CombatLogModifyInterruptArmor")
 	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogModifyInterruptArmor"))
 end
@@ -579,7 +582,7 @@ end
 local tCombatLogDelayDeath = { 'NoClue' }
 function addon:OnCombatLogDelayDeath(tEventArgs)
 	local tTextInfo = self:HelperParseEvent(tEventArgs, tCombatLogDelayDeath, "CombatLogDelayDeath")
-	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogModifyInterruptArmor"))
+	self:putLine(getLineFromIndexedTable(tTextInfo, "CombatLogDelayDeath"))
 end
 
 local tCombatLogImmunity = { 'NoClue' }
