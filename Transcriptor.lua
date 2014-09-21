@@ -4,7 +4,7 @@
 -- by Caleb calebzor@gmail.com
 -----------------------------------------------------------------------------------------------
 
-local gameVersion, buildVersion = "Live", "1.0.0.6851"
+local gameVersion, buildVersion = "Live", "1.0.0.6879"
 
 require "Window"
 require "GameLib"
@@ -17,8 +17,9 @@ require "ChatSystemLib"
 local Apollo = Apollo
 local setmetatable = setmetatable
 local ipairs = ipairs
-local pairs = pairs
-local os = os
+
+local GetDate = os.date
+local GetTime = GameLib.GetGameTime
 local tostring = tostring
 local Print = Print
 local GameLib = GameLib
@@ -30,15 +31,15 @@ local Transcriptor = {}
 local addon = Transcriptor
 local tSessionDB
 local chatFilter = {
-	ChatSystemLib.ChatChannel_NPCSay,     --20
-	ChatSystemLib.ChatChannel_NPCYell,    --21
-	ChatSystemLib.ChatChannel_NPCWhisper, --22
-	ChatSystemLib.ChatChannel_Datachron,  --23
-	--ChatSystemLib.ChatChannel_Say,        --4
-	ChatSystemLib.ChatChannel_System,     --2
-	ChatSystemLib.ChatChannel_Zone,       --9
-	ChatSystemLib.ChatChannel_Instance,   --32
-	ChatSystemLib.ChatChannel_Realm,      --25
+	[ChatSystemLib.ChatChannel_NPCSay] 		= true, --20
+	[ChatSystemLib.ChatChannel_NPCYell] 	= true, --21
+	[ChatSystemLib.ChatChannel_NPCWhisper] 	= true, --22
+	[ChatSystemLib.ChatChannel_Datachron] 	= true, --23
+	--[ChatSystemLib.ChatChannel_Say] 		= true, -- 4
+	[ChatSystemLib.ChatChannel_System] 		= true, -- 2 
+	[ChatSystemLib.ChatChannel_Zone] 		= true, -- 9
+	[ChatSystemLib.ChatChannel_Instance] 	= true, --32
+	[ChatSystemLib.ChatChannel_Realm] 		= true, --25
 }
 local tooltipText = "\
 <T Font='CRB_InterfaceMedium_B' TextColor='ffffffff'>\
@@ -84,7 +85,7 @@ function addon:EnableLogging()
 	if GameLib.GetCurrentZoneMap() then
 		zone = GameLib.GetCurrentZoneMap().strName
 	end
-	self.sSession = ("%s - %s/%s/%s/%s/%s/%s/%s"):format(os.date(), "map", zone, "subzone", GameLib.GetWorldDifficulty(), "revision", gameVersion, buildVersion) -- XXX fill these out
+	self.sSession = ("%s - %s/%s/%s/%s/%s/%s/%s"):format(GetDate(), "map", zone, "subzone", GameLib.GetWorldDifficulty(), "revision", gameVersion, buildVersion) -- XXX fill these out
 	self.tDB[self.sSession] = {}
 	self.bLogging = true
 	self.wndMain:GetChildren()[1]:SetText("Transcriptor: On")
@@ -151,7 +152,7 @@ function addon:OnButton()
 			Print("Transcriptor: you can only clear data if you are not logging!")
 		else
 			self.tPrevDB = {}
-			for k, v in pairs(tSessionDB) do
+			for k, v in next, tSessionDB do
 				tSessionDB[k] = nil
 			end
 			Print("Transcriptor: cleared all sessions data.")
@@ -186,7 +187,7 @@ end
 function addon:OnSave(eLevel)
 	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then return end
 
-	for k, v in pairs(tSessionDB) do
+	for k, v in next, tSessionDB do
 		self.tPrevDB[k] = v
 	end
 	local l,t,r,b = self.wndMain:GetAnchorOffsets()
@@ -214,16 +215,16 @@ end
 -----------------------------------------------------------------------------------------------
 
 local function getLineFromIndexedTable(t, sEvent)
-	local s = ("%s#%s"):format(GameLib.GetGameTime(), sEvent)
+	local s = GetTime() .. '#' .. sEvent
 
 	if not t[1] then -- not an indexed table that we generated
-		s = ("%s#%s"):format(s, 'nil#nil#nil#nil#nil#nil#nil#nil#MISSING_ARGUEMENTS')
-		for k, v in pairs(t) do
+		s = s .. '#nil#nil#nil#nil#nil#nil#nil#nil#MISSING_ARGUEMENTS'
+		for k, v in next, t do
 			s = ("%s#%s:%s"):format(s, tostring(k), tostring(v) or "")
 		end
 	else
-		for k, v in ipairs(t) do
-			s = ("%s#%s"):format(s, tostring(v) or "")
+		for _, v in ipairs(t) do -- cannot use table.concat, because non strings :/
+			s = ("%s#%s"):format(s, tostring(v) or 'nil')
 		end
 	end
 	return s
@@ -235,8 +236,8 @@ end
 
 local function checkForMissingBuffById(unit, id)
 	local unitBuffs = unit:GetBuffs()
-	for strBuffType, buffTypeValue  in pairs(unitBuffs) do
-		for _, s in pairs(buffTypeValue) do
+	for strBuffType, buffTypeValue  in next, unitBuffs do
+		for _, s in next, buffTypeValue do
 			if id == s.idBuff then
 				return false
 			end
@@ -254,14 +255,15 @@ end
 
 local function checkForMissingKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues, sEvent)
 	local bKeysMissing = false
-	for k, _ in pairs(tEventArgs) do
+	for k, _ in next, tEventArgs do
 		local bKeyNotMissing
-		for _, sEventArgKey in ipairs(tEventSpecificValues) do
+		for _, sEventArgKey in next, tEventSpecificValues do
 			if k == sEventArgKey then
 				bKeyNotMissing = true
 				break
 			end
 		end
+		if k == "unitCaster" or k == "unitTarget" or k == "unitCasterOwner" or k == "unitTargetOwner" then bKeyNotMissing = true end
 		if not bKeyNotMissing then
 			trackMissmatchingArg(sEvent, k, "tEventSpecificValues") -- aka missing from our indexed list
 			bKeysMissing = true
@@ -272,9 +274,9 @@ end
 
 local function checkForRenamedOrRemovedKeysIn_tEventSpecificValues(tEventArgs, tEventSpecificValues, sEvent)
 	local bKeysMissing = false
-	for _, k in ipairs(tEventSpecificValues) do
+	for _, k in next, tEventSpecificValues do
 		local bKeyNotMissing
-		for sEventArgKey, _ in pairs(tEventArgs) do
+		for sEventArgKey, _ in next, tEventArgs do
 			if sEventArgKey == k then
 				bKeyNotMissing = true
 				break
@@ -345,41 +347,40 @@ function addon:HelperParseEvent(tEventArgs, tEventSpecificValues, sEvent)
 end
 
 function addon:HelperGetName(nArg)
-	if nArg and nArg:GetName() then
-		return nArg:GetName()
-	end
-	return 'nil' -- on purpose
+	return nArg and nArg:GetName() or 'nil' -- on purpose
 end
 
 function addon:HelperGetId(nArg)
-	if nArg and nArg:GetId() then
-		return nArg:GetId()
-	end
-	return 'nil' -- on purpose
+	return nArg and nArg:GetId() or 'nil' -- on purpose
 end
 
-local function checkChatFilter(channelType)
-	for _, v in ipairs(chatFilter) do
-		if v == channelType then
-			return true
-		end
-	end
-	return false
-end
 
 -----------------------------------------------------------------------------------------------
 -- Event handlers
 -----------------------------------------------------------------------------------------------
 
 function addon:OnChatMessage(channelCurrent, tMessage)
-	if checkChatFilter(channelCurrent:GetType()) then
-		local strMessage = ""
-		for _, tSegment in ipairs(tMessage.arMessageSegments) do
-			strMessage = strMessage .. tSegment.strText
-		end
-		local tTextInfo = {channelCurrent:GetType(), tMessage.bAutoResponse, tMessage.bGM, tMessage.bSelf, tMessage.strSender, tMessage.strRealmName, tMessage.nPresenceState, strMessage, tMessage.unitSource and tMessage.unitSource:GetName() or "", tMessage.bShowChatBubble, tMessage.bCrossFaction}
-		self:putLine(getLineFromIndexedTable(tTextInfo, "OnChatMessage"))
+	if not chatFilter[channelCurrent:GetType()] then return end
+	
+	local strMessage = ""
+	for _, tSegment in ipairs(tMessage.arMessageSegments) do
+		strMessage = strMessage .. tSegment.strText
 	end
+	
+	local tTextInfo = {
+		tMessage.unitSource and tMessage.unitSource:GetName() or tMessage.strSender,
+		tMessage.unitSource and tMessage.unitSource:GetId() or 'nil',
+		'nil',
+		'nil',
+		'nil',
+		'nil',
+		'nil',
+		'nil',
+		channelCurrent:GetType(),
+		strMessage,
+		tMessage.nPresenceState,
+	}
+	self:putLine(getLineFromIndexedTable(tTextInfo, "OnChatMessage"))
 end
 
 
@@ -387,7 +388,7 @@ local tBuff = {"splCallingSpell", "bHarmful", "nCount", "fTimeRemaining"}
 local tSpellData = { "strSpellName", "strSpellId", "fCastDuration", "fCastElapsed" }
 function addon:OnUpdate()
 
-	for k, v in pairs(self.tUnits) do
+	for k, v in next, self.tUnits do
 		local unit = v.unit
 		if not unit:IsValid() then
 			self.tUnits[k] = nil
@@ -403,11 +404,11 @@ function addon:OnUpdate()
 			end
 			-- buffs applied
 			local unitBuffs = unit:GetBuffs()
-			for strBuffType, buffTypeValue  in pairs(unitBuffs) do
+			for strBuffType, buffTypeValue  in next, unitBuffs do
 				local bHarmful = (strBuffType == "arHarmful") and true or false
 				local unitType = unit:GetType()
 				if unitType and ((bHarmful and unitType == "Player") or (not bHarmful and unitType == "NonPlayer")) then -- XXX only track player debuffs and non player buffs
-					for _, buffData in pairs(buffTypeValue) do
+					for _, buffData in next, buffTypeValue do
 						
 						if self.tUnits[k].buffs[buffData.idBuff] then -- refresh
 							if buffData.fTimeRemaining > self.tUnits[k].buffs[buffData.idBuff].fTimeRemaining and buffData.nCount == self.tUnits[k].buffs[buffData.idBuff].nCount then
@@ -442,7 +443,7 @@ function addon:OnUpdate()
 				end
 			end
 			-- buffs removed
-			for buffId, buffData in pairs(v.buffs) do
+			for buffId, buffData in next, v.buffs do
 				-- remember right now only player debuffs and non player buffs are tracked
 				if checkForMissingBuffById(unit, buffId) then
 					local sEvent = 'AuraRemoved'
@@ -453,17 +454,6 @@ function addon:OnUpdate()
 			end
 		end
 	end
-end
-
-function addon:OnUnitCreated(unit)
-	self.tUnits[unit:GetId()] = {}
-	self.tUnits[unit:GetId()]["unit"] = unit
-	self.tUnits[unit:GetId()].buffs = {}
-	self.tUnits[unit:GetId()].debuffs = {}
-end
-
-function addon:OnUnitDestroyed(unit)
-	self.tUnits[unit:GetId()] = nil
 end
 
 local tCombatLogTransference = { "splCallingSpell", "eDamageType", "nDamageAmount", "nShield", "nAbsorption", "nOverkill", "eCombatResult", "bTargetVulnerable", "tHealData" }
@@ -510,9 +500,9 @@ function addon:OnEnteredCombat(unit, bInCombat)
 	self:putLine(getLineFromIndexedTable(tTextInfo, "UnitEnteredCombat"))
 
 	if bInCombat and not self.tUnits[unit:GetId()] then
-		self:OnUnitCreated(unit)
+		self.tUnits[unit:GetId()] = { unit = unit, buffs = {}, debuffs = {} }
 	elseif not bInCombat then
-		self:OnUnitDestroyed(unit)
+		self.tUnits[unit:GetId()] = nil
 	end
 end
 
